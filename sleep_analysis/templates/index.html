@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SleepSync AI - Smart Mood Light</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg1: #06101d;
+      --bg2: #0d1730;
+      --card: rgba(16, 24, 40, 0.72);
+      --card-strong: rgba(16, 24, 40, 0.88);
+      --stroke: rgba(255,255,255,0.09);
+      --text: #eef5ff;
+      --muted: #a9bbd4;
+      --accent: #52b6ff;
+      --accent2: #7c5cff;
+      --good: #49dcb1;
+      --warn: #f7c948;
+      --bad: #ff6b6b;
+      --shadow: 0 30px 80px rgba(0,0,0,0.45);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: Inter, Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(82, 182, 255, 0.22), transparent 30%),
+        radial-gradient(circle at top right, rgba(124, 92, 255, 0.18), transparent 28%),
+        radial-gradient(circle at bottom, rgba(73, 220, 177, 0.10), transparent 30%),
+        linear-gradient(160deg, var(--bg1), var(--bg2));
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.06), transparent 18%),
+        radial-gradient(circle at 80% 10%, rgba(255,255,255,0.05), transparent 16%),
+        radial-gradient(circle at 75% 80%, rgba(255,255,255,0.05), transparent 20%);
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .wrap {
+      width: min(1280px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 28px 0 48px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,0.85), rgba(255,255,255,0.15) 18%, transparent 26%),
+        linear-gradient(145deg, rgba(82,182,255,1), rgba(124,92,255,1));
+      box-shadow: 0 0 30px rgba(82,182,255,0.35), inset 0 1px 0 rgba(255,255,255,0.35);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 26px;
+      letter-spacing: -0.5px;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.04);
+      border-radius: 999px;
+      color: #dce8f9;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.25fr 0.95fr;
+      gap: 18px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+      border: 1px solid var(--stroke);
+      border-radius: 28px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .score-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 470px;
+    }
+
+    .score-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .score-header h2 {
+      margin: 0;
+      font-size: 18px;
+      color: #dce8f9;
+      font-weight: 600;
+    }
+
+    .small-note {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .status-chip {
+      padding: 9px 14px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 13px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+    }
+
+    .big-score {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      position: relative;
+      margin: 10px 0 16px;
+    }
+
+    .lamp {
+      width: min(320px, 100%);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      position: relative;
+      display: grid;
+      place-items: center;
+      transition: 250ms ease;
+      background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.95), rgba(255,255,255,0.15) 18%, transparent 28%), var(--accent);
+      box-shadow:
+        0 0 20px color-mix(in srgb, var(--accent) 45%, transparent),
+        0 0 50px color-mix(in srgb, var(--accent) 50%, transparent),
+        0 0 100px color-mix(in srgb, var(--accent) 55%, transparent),
+        inset 0 1px 0 rgba(255,255,255,0.28);
+    }
+
+    .lamp::before {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.20);
+      background: radial-gradient(circle at 30% 28%, rgba(255,255,255,0.18), transparent 34%);
+      opacity: 0.7;
+    }
+
+    .score-text {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      text-shadow: 0 0 18px rgba(0,0,0,0.3);
+    }
+
+    .score-text .value {
+      font-size: clamp(62px, 9vw, 92px);
+      line-height: 0.95;
+      font-weight: 800;
+      letter-spacing: -3px;
+    }
+
+    .score-text .unit {
+      margin-top: 6px;
+      color: rgba(255,255,255,0.88);
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .metric {
+      padding: 14px 16px;
+      border-radius: 20px;
+      background: rgba(8, 14, 26, 0.44);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .metric .num {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .analysis {
+      min-height: 470px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .analysis h3, .section-title {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .analysis p {
+      margin: 0;
+      color: #d8e5f7;
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    .insight-box {
+      padding: 18px;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(5, 10, 18, 0.35);
+    }
+
+    .insight-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .insight {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 13px 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+    }
+
+    .insight span:first-child {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .insight strong {
+      font-size: 14px;
+    }
+
+    .controls {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .control-card {
+      min-height: 240px;
+    }
+
+    .slider-wrap {
+      display: grid;
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    .slider-item {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(8, 14, 26, 0.42);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .slider-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 10px;
+      gap: 10px;
+    }
+
+    .slider-head .name { font-weight: 700; }
+    .slider-head .value {
+      color: #f0f6ff;
+      font-weight: 800;
+      font-size: 16px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 14px;
+      cursor: pointer;
+      color: white;
+      font-weight: 700;
+      background: linear-gradient(135deg, rgba(82,182,255,1), rgba(124,92,255,1));
+      box-shadow: 0 10px 24px rgba(82,182,255,0.18);
+    }
+
+    .btn.secondary {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      box-shadow: none;
+    }
+
+    .btn.danger {
+      background: linear-gradient(135deg, #ff6b6b, #e91e63);
+      box-shadow: 0 10px 24px rgba(233, 30, 99, 0.2);
+    }
+
+    .chart-card { margin-top: 18px; }
+    .chart-box { height: 280px; margin-top: 12px; }
+
+    .footer-note {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .sensor-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .sensor {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .sensor .top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .sensor .bottom {
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    @media (max-width: 1100px) {
+      .grid, .controls { grid-template-columns: 1fr; }
+      .score-panel, .analysis { min-height: auto; }
+      .sensor-grid, .metrics { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 720px) {
+      .wrap { width: min(100% - 22px, 1280px); padding-top: 18px; }
+      .brand h1 { font-size: 22px; }
+      .sensor-grid, .metrics { grid-template-columns: 1fr 1fr; }
+      .card { border-radius: 22px; padding: 16px; }
+      .lamp { width: min(280px, 100%); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>SleepSync AI</h1>
+          <p>수면 환경을 색으로 보여주는 스마트 무드등</p>
+        </div>
+      </div>
+      
+      <div style="display:flex; gap:12px; align-items:center;">
+
+        <div id="demo-pill" class="pill">
+          실시간 모니터링 중
+        </div>
+
+        <div
+          id="lamp-pill"
+          class="pill"
+          onclick="toggleLamp()"
+          style="
+            cursor:pointer;
+            user-select:none;
+            transition:all 0.25s ease;
+          "
+        >
+          무드등 OFF
+        </div>
+
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card score-panel">
+        <div class="score-header">
+          <div>
+            <h2>오늘의 수면 적합도</h2>
+            <div class="small-note">온도와 습도 기준으로 현재 환경을 평가합니다.</div>
+          </div>
+          <div class="status-chip" id="statusChip">쾌적</div>
+        </div>
+
+        <div class="big-score">
+          <div class="lamp" id="lamp" ondblclick="startSleep()">
+            <div class="score-text">
+              <div class="value" id="scoreValue">92</div>
+              <div class="unit">수면 적합도</div>
+            </div>
+          </div>
+        </div>
+
+       
+
+        <div class="metrics">
+          <div class="metric">
+            <div class="label">온도</div>
+            <div class="num"><span id="tempValue">22.0</span>°C</div>
+          </div>
+          <div class="metric">
+            <div class="label">습도</div>
+            <div class="num"><span id="humValue">50</span>%</div>
+          </div>
+          <div class="metric">
+            <div class="label">권장 상태</div>
+            <div class="num" id="stateText">매우 쾌적</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card analysis">
+        <div>
+          <h3>AI 분석</h3>
+          <p id="analysisText">
+            현재 침실 환경은 수면에 매우 적합합니다. 파란색 계열의 조명이 유지되며, 편안한 수면 환경으로 판단됩니다.
+          </p>
+
+          <div class="sensor-grid">
+
+           <div class="sensor">
+              <div class="top">
+                <span>온도</span>
+                <span>실시간</span>
+              </div>
+              <div class="bottom" id="temp-status">
+                22°C
+              </div>
+            </div>
+
+            <div class="sensor">
+              <div class="top">
+                <span>습도</span>
+                <span>실시간</span>
+              </div>
+              <div class="bottom" id="humidity-status">
+                50%
+              </div>
+            </div>
+
+            <div class="sensor">
+              <div class="top">
+                <span>뒤척임</span>
+                <span>실시간</span>
+              </div>
+              <div class="bottom" id="motion-status">
+                안정
+              </div>
+            </div>
+
+            <div class="sensor">
+              <div class="top">
+                <span>소음</span>
+                <span>실시간</span>
+              </div>
+              <div class="bottom" id="noise-status">
+                조용함
+              </div>
+            </div>
+
+          </div>
+
+          <div class="insight-box" style="margin-top: 16px;">
+            <div class="section-title">지난 수면 결과</div>
+
+          <div class="insight-list">
+
+            <div class="insight">
+              <span>평균 온도</span>
+              <strong id="avgTemp">-</strong>
+            </div>
+
+            <div class="insight">
+              <span>평균 습도</span>
+              <strong id="avgHumidity">-</strong>
+            </div>
+
+           <div class="insight">
+              <span>뒤척임</span>
+              <strong id="tossCount">0회</strong>
+            </div>
+
+            <div class="insight">
+              <span>소음</span>
+              <strong id="noiseCount">0회</strong>
+            </div>
+
+            
+
+          </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      
+      <div id="normal-user-panel" class="card control-card">
+        <div class="section-title">오늘의 수면 품질 입력</div>
+        <div class="small-note">간밤에 얼마나 편안하게 주무셨나요?</div>
+        
+        <div class="slider-wrap" style="margin-top: 24px;">
+          <div class="slider-item">
+            <div class="slider-head">
+              <div class="name">수면 점수</div>
+              <div class="value" id="userScoreLabel">50점</div>
+            </div>
+            <input id="daily-sleep-score" type="range" min="0" max="100" step="1" value="50" oninput="document.getElementById('userScoreLabel').innerText = this.value + '점'">
+          </div>
+        </div>
+
+        <div class="buttons" style="margin-top: 24px;">
+          <button class="btn" onclick="submitUserScore()" style="width: 100%; padding: 16px; font-size: 16px;">점수 저장</button>
+        </div>
+      </div>
+
+      <div id="dev-simulation-panel" class="card control-card" style="display: none;">
+        <div class="section-title">시뮬레이션 입력 (개발자용)</div>
+        <div class="small-note">슬라이더를 움직이면 무드등 색과 점수가 바로 바뀝니다.</div>
+
+        <div class="slider-wrap">
+          <div class="slider-item" style="padding: 12px;">
+            <div class="slider-head">
+              <div class="name">온도 (°C)</div>
+              <div class="value" id="tempLabel">22.0</div>
+            </div>
+            <input id="tempSlider" type="range" min="12" max="34" step="0.1" value="22">
+          </div>
+
+          <div class="slider-item" style="padding: 12px;">
+            <div class="slider-head">
+              <div class="name">습도 (%)</div>
+              <div class="value" id="humLabel">50</div>
+            </div>
+            <input id="humSlider" type="range" min="20" max="80" step="1" value="50">
+          </div>
+        </div>
+        <div class="buttons">
+          <button class="btn secondary" id="demoButton" style="flex: 1;">권장값 복구</button>
+
+          <button class="btn secondary" onclick="resetProfile()" style="flex: 1;">
+             AI 학습 초기화
+          </button>
+
+          <button class="btn danger" onclick="triggerNextDay()" style="flex: 2;">
+             다음 날로 강제 점프
+          </button>
+        </div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="section-title">최근 7일 수면 점수</div>
+        <div class="small-note">실제 저장된 수면 데이터 추이 기록 (예시)</div>
+        <div class="chart-box">
+          <canvas id="sleepChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let isDevMode = false;
+    let clickCount = 0;
+
+
+
+    async function startSleep() {
+      
+      const ok = confirm(
+        "지금부터 수면 측정을 시작할까요?"
+      );
+
+      if (!ok) return;
+
+      const response = await fetch(
+        "/api/start-sleep",
+        {
+          method: "POST"
+        }
+      );
+
+      const data = await response.json();
+
+      alert(data.message);
+
+      location.reload();
+      
+    }
+    async function toggleLamp() {
+
+        const response = await fetch(
+          "/api/toggle-lamp",
+          {
+            method: "POST"
+          }
+        );
+
+        const data = await response.json();
+
+        const lampPill =
+          document.getElementById("lamp-pill");
+
+        if (data.enabled) {
+
+          lampPill.innerHTML =
+            "무드등 ON";
+
+          lampPill.style.background =
+            "rgba(0,255,120,0.15)";
+
+          lampPill.style.border =
+            "1px solid rgba(0,255,120,0.4)";
+
+        } else {
+
+          lampPill.innerHTML =
+            "무드등 OFF";
+
+          lampPill.style.background =
+            "";
+
+          lampPill.style.border =
+            "";
+        }
+      }async function loadLampStatus() {
+
+  const response =
+    await fetch('/api/lamp-status');
+
+  const data =
+    await response.json();
+
+  const lampPill =
+    document.getElementById("lamp-pill");
+
+  if (data.enabled) {
+
+    lampPill.innerHTML =
+      "무드등 ON";
+
+    lampPill.style.background =
+      "rgba(0,255,120,0.15)";
+
+    lampPill.style.border =
+      "1px solid rgba(0,255,120,0.4)";
+
+  } else {
+
+    lampPill.innerHTML =
+      "무드등 OFF";
+  }
+}
+      
+
+document.querySelector(".logo").addEventListener("click", () => {
+    clickCount++;
+
+    if (clickCount >= 5) {
+        clickCount = 0;
+        checkDevPassword();
+    }
+});
+
+    // DOM 요소
+    const tempSlider = document.getElementById("tempSlider");
+    const humSlider = document.getElementById("humSlider");
+    const tempValue = document.getElementById("tempValue");
+    const humValue = document.getElementById("humValue");
+    const tempLabel = document.getElementById("tempLabel");
+    const humLabel = document.getElementById("humLabel");
+    const scoreValue = document.getElementById("scoreValue");
+    const stateText = document.getElementById("stateText");
+    const statusChip = document.getElementById("statusChip");
+    const analysisText = document.getElementById("analysisText");
+    const colorName = document.getElementById("colorName");
+    const lamp = document.getElementById("lamp");
+
+    // 1. 개발자 모드 인증 로직
+    function checkDevPassword() {
+        const pwd = prompt("개발자 모드 활성화 암호를 입력하세요:");
+        if (!pwd) return;
+
+        fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pwd })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                isDevMode = true;
+                // 패널 스위칭
+                document.getElementById('dev-simulation-panel').style.display = 'block';
+                document.getElementById('normal-user-panel').style.display = 'none';
+                document.getElementById('dev-auth-btn').style.display = 'none';
+                document.getElementById('demo-pill').textContent = "● Developer Mode Active";
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(err => console.error(err));
+    }
+
+    // 2. 일반 유저용 수면 점수 저장 로직
+    function submitUserScore() {
+        const score = document.getElementById('daily-sleep-score').value;
+        fetch('/api/save-score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ score: score })
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message);
+            location.reload(); 
+        })
+        .catch(err => console.error(err));
+    }
+
+    // 3. 개발자 강제 점프 로직 (백엔드 동기화 후 점프)
+    function triggerNextDay() {
+        const t = parseFloat(tempSlider.value);
+        const h = parseFloat(humSlider.value);
+
+        // 현재 슬라이더 값을 백엔드에 알려준 뒤 강제 점프 실행
+        fetch('/api/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ temp: t, humidity: h })
+        }).then(() => {
+            fetch('/api/dev/next-day', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            });
+        });
+    }
+    async function resetProfile() {
+
+  const ok = confirm(
+    "AI 학습 데이터를 초기화하시겠습니까?"
+  );
+
+  if (!ok) return;
+
+  const response = await fetch(
+    "/api/reset-profile",
+    {
+      method: "POST"
+    }
+  );
+
+  const data = await response.json();
+
+  alert(data.message);
+  location.reload();
+}
+
+    
+
+    // --- 이하 기존 UI 렌더링 수식 ---
+async function calculateScore(temp, hum) {
+
+    const response = await fetch('/api/predict', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            temp: temp,
+            humidity: hum
+        })
+    });
+
+    const data = await response.json();
+
+    return data.personalized_score;
+}
+
+    function getMood(score) {
+      if (score >= 85) {
+        return { label: "매우 쾌적", chip: "좋음", color: "#4aa8ff", colorName: "파란색 계열", message: "현재 침실 환경은 수면에 매우 적합합니다. 파란색 계열 조명이 유지되며, 편안한 수면을 기대할 수 있습니다.", glow: "0 0 20px rgba(74, 168, 255, .35), 0 0 50px rgba(74, 168, 255, .40), 0 0 110px rgba(74, 168, 255, .45)" };
+      }
+      if (score >= 70) {
+        return { label: "양호", chip: "보통", color: "#48d8c0", colorName: "청록색 계열", message: "전반적으로 양호합니다. 조금 더 조정하면 수면 만족도를 더 높일 수 있습니다.", glow: "0 0 20px rgba(72, 216, 192, .30), 0 0 50px rgba(72, 216, 192, .35), 0 0 100px rgba(72, 216, 192, .40)" };
+      }
+      if (score >= 50) {
+        return { label: "주의", chip: "보통", color: "#ffcc4d", colorName: "노란색 계열", message: "수면 환경이 완전히 나쁘지는 않지만, 온도나 습도를 조금 더 조정하면 좋습니다.", glow: "0 0 20px rgba(255, 204, 77, .28), 0 0 50px rgba(255, 204, 77, .30), 0 0 100px rgba(255, 204, 77, .34)" };
+      }
+      return { label: "개선 필요", chip: "나쁨", color: "#ff6b6b", colorName: "빨간색 계열", message: "현재 환경은 수면에 적합하지 않습니다. 온도와 습도를 먼저 조정하는 것이 좋습니다.", glow: "0 0 20px rgba(255, 107, 107, .30), 0 0 50px rgba(255, 107, 107, .35), 0 0 100px rgba(255, 107, 107, .40)" };
+    }
+
+    async function updateUI() {
+      const temp = parseFloat(tempSlider.value);
+      const hum = parseFloat(humSlider.value);
+      const score = await calculateScore(temp, hum);
+      const mood = getMood(score);
+      /*await fetch('/api/set-led', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          score: score
+        })
+      });*/
+      
+      const statusResponse =
+        await fetch('/api/status');
+
+      const statusData =
+        await statusResponse.json();
+      
+      const demoPill =
+        document.getElementById("demo-pill");  
+
+      if (statusData.sleeping) {
+
+        demoPill.textContent =
+          "● 수면 측정 중";
+
+        demoPill.style.background =
+          "rgba(0,255,120,0.15)";
+
+        demoPill.style.border =
+          "1px solid rgba(0,255,120,0.4)";
+
+      } else {
+
+        demoPill.textContent =
+          "● 실시간 모니터링 중";
+
+        demoPill.style.background =
+          "";
+
+        demoPill.style.border =
+          "";
+
+      }
+
+      tempValue.textContent = temp.toFixed(1);
+      humValue.textContent = Math.round(hum);
+      tempLabel.textContent = temp.toFixed(1);
+      humLabel.textContent = Math.round(hum);
+
+      scoreValue.textContent = score;
+      stateText.textContent = mood.label;
+      statusChip.textContent = mood.chip;
+      analysisText.textContent = mood.message;
+      //colorName.textContent = mood.colorName;
+
+      lamp.style.setProperty("--accent", mood.color);
+      lamp.style.background = `radial-gradient(circle at 35% 35%, rgba(255,255,255,0.95), rgba(255,255,255,0.14) 18%, transparent 28%), ${mood.color}`;
+      lamp.style.boxShadow = mood.glow + ", inset 0 1px 0 rgba(255,255,255,0.28)";
+      document.documentElement.style.setProperty("--accent", mood.color);
+      statusChip.style.background = `color-mix(in srgb, ${mood.color} 20%, rgba(255,255,255,0.06))`;
+      statusChip.style.color = score >= 85 ? "#dff4ff" : "#fff";
+    }
+
+    // 개발자 모드에서 슬라이더 조작 시 즉시 반영
+    tempSlider.addEventListener("input", updateUI);
+    humSlider.addEventListener("input", updateUI);
+
+    document.getElementById("demoButton").addEventListener("click", () => {
+      tempSlider.value = 22; humSlider.value = 50;
+      updateUI();
+    });
+
+    // 4. 백엔드 실시간 동기화 폴링 (일반 사용자 모드일 때 센서 데이터 지속 업데이트)
+    async function loadLastSleep() {
+      console.log("LOAD LAST SLEEP");
+
+
+    try {
+
+        const response =
+            await fetch('/api/last-sleep');
+
+        const data =
+            await response.json();
+        console.log(data);
+
+        document.getElementById("avgTemp").innerText =
+            `${data.avg_temp}°C`;
+
+        document.getElementById("avgHumidity").innerText =
+            `${data.avg_humidity}%`;
+
+        document.getElementById("tossCount").innerText =
+            `${data.toss_count}회`;
+
+        document.getElementById("noiseCount").innerText =
+            `${data.noise_count}회`;
+
+        
+
+    } catch (e) {
+
+        console.log("last sleep load fail");
+
+    }
+}
+    setInterval(() => {
+        if (isDevMode) return; // 개발자 모드면 프론트 슬라이더를 우선시함
+        fetch('/api/status')
+        .then(res => res.json())
+        .then(data => {
+            tempSlider.value = data.temp;
+            humSlider.value = data.humidity;
+            updateUI(); // 무드등 업데이트
+
+            // 야간 발생 이벤트(뒤척임, 소음) 카운트 갱신
+
+        document.getElementById("temp-status").innerText =
+          `${data.temp.toFixed(1)}°C`;
+
+        document.getElementById("humidity-status").innerText =
+          `${Math.round(data.humidity)}%`;
+
+        document.getElementById("noise-status").innerText =
+          data.noise ? "소음 감지" : "조용함";
+
+        document.getElementById("motion-status").innerText =
+          data.toss_turn ? "뒤척임 감지" : "안정";
+
+        })
+        .catch(err => console.error("백엔드 연결 대기중..."));
+    }, 200);
+
+    // 차트 초기화
+    const ctx = document.getElementById("sleepChart");
+    const sleepChart = new Chart(ctx, {
+  type: "line",
+  data: {
+    labels: [],
+    datasets: [{
+      label: "수면 점수",
+      data: [],
+      borderColor: "#7cc7ff",
+      backgroundColor: "rgba(124, 199, 255, 0.15)",
+      fill: true,
+      tension: 0.35,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      pointBackgroundColor: "#ffffff",
+      pointBorderColor: "#7cc7ff",
+      borderWidth: 3
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: "#dce8f9"
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: "#a9bbd4"
+        },
+        grid: {
+          color: "rgba(255,255,255,0.06)"
+        }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        ticks: {
+          color: "#a9bbd4"
+        },
+        grid: {
+          color: "rgba(255,255,255,0.06)"
+        }
+      }
+    }
+  }
+});
+
+
+async function loadSleepHistory() {
+
+  const response = await fetch(
+    "/api/sleep-history"
+  );
+
+  const scores = await response.json();
+
+  if (!scores.length) return;
+
+ const labels = [];
+
+for (let i = 0; i < scores.length; i++) {
+
+  const daysAgo = scores.length - i - 1;
+
+  if (daysAgo === 0)
+    labels.push("오늘");
+  else
+    labels.push(`${daysAgo}일전`);
+}
+
+  sleepChart.data.labels = labels;
+  sleepChart.data.datasets[0].data = scores;
+
+  sleepChart.update();
+}
+
+    updateUI();
+    loadSleepHistory();
+    loadLastSleep();
+    loadLampStatus();
+  </script>
+</body>
+</html>
